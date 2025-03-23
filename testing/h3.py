@@ -269,7 +269,7 @@ from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter(tb_dir)
 
 # ENHANCED: Advanced training loop with cosine annealing and gradient clipping
-epochs = 1  # Increased epochs
+epochs = 25  # Increased epochs
 batch_size = 64  # Larger batch size for better stability
 best_model_paths = [os.path.join(os.path.dirname(__file__), f"best_hybrid_model_{i}.pt") for i in range(n_models)]
 
@@ -516,6 +516,137 @@ plt.legend()
 plt.tight_layout()
 plt.savefig('/Users/ca5/Desktop/qnn_fnl/enhanced_qnn_results.png', dpi=300)
 logger.info("Results visualization saved to '/Users/ca5/Desktop/qnn_fnl/enhanced_qnn_results.png'")
+
+# Additional advanced visualizations
+logger.info("Generating additional advanced visualization graphs...")
+
+# 1. Q-Q Plot to check normality of residuals
+from scipy import stats
+plt.figure(figsize=(10, 6))
+stats.probplot(errors, plot=plt)
+plt.title('Q-Q Plot of Residuals')
+plt.savefig(os.path.join(graphs_dir, "qq_plot_residuals.png"), dpi=300)
+plt.close()
+logger.info("Q-Q plot generated to check normality of residuals")
+
+# 2. Feature importance visualization
+if X_train.shape[1] <= 20:  # Only for reasonable number of features
+    try:
+        # Calculate feature importance based on correlation with target
+        importances = np.zeros(X_train.shape[1])
+        for i in range(X_train.shape[1]):
+            importances[i] = abs(np.corrcoef(X_train[:, i], y_train_scaled)[0, 1])
+        
+        # Sort features by importance
+        indices = np.argsort(importances)[::-1]
+        
+        plt.figure(figsize=(12, 8))
+        plt.bar(range(min(20, len(indices))), importances[indices[:20]])
+        plt.title('Feature Importance (Correlation-based)')
+        plt.xlabel('Feature Index')
+        plt.ylabel('Absolute Correlation with Target')
+        plt.xticks(range(min(20, len(indices))), indices[:20], rotation=90)
+        plt.tight_layout()
+        plt.savefig(os.path.join(graphs_dir, "feature_importance.png"), dpi=300)
+        plt.close()
+        logger.info("Feature importance visualization created")
+    except Exception as e:
+        logger.warning(f"Could not create feature importance plot: {e}")
+
+# 3. Visualize individual model predictions in the ensemble
+plt.figure(figsize=(12, 8))
+X_subset = X_test_tensor[:100]  # Use subset for clearer visualization
+y_subset = y_test.values[:100]
+
+for i, model in enumerate(models):
+    model.eval()
+    with torch.no_grad():
+        pred = model(X_subset).numpy()
+        pred = y_scaler.inverse_transform(pred).flatten()
+        plt.plot(pred, alpha=0.5, label=f'Model {i+1}')
+
+plt.plot(y_subset, 'k-', linewidth=2, label='Actual')
+plt.xlabel('Test Sample Index')
+plt.ylabel('dGmix Value')
+plt.title('Individual Model Predictions vs Actual')
+plt.legend()
+plt.savefig(os.path.join(graphs_dir, "ensemble_predictions.png"), dpi=300)
+plt.close()
+logger.info("Ensemble predictions visualization created")
+
+# 4. Learning rate over epochs visualization
+plt.figure(figsize=(10, 6))
+for i, scheduler in enumerate(schedulers):
+    lr_history = []
+    for param_group in optimizers[i].param_groups:
+        lr_history.append(param_group['lr'])
+    plt.plot(lr_history, label=f'Model {i+1}')
+plt.xlabel('Epoch')
+plt.ylabel('Learning Rate')
+plt.title('Learning Rate Schedule')
+plt.legend()
+plt.savefig(os.path.join(graphs_dir, "learning_rate_schedule.png"), dpi=300)
+plt.close()
+logger.info("Learning rate schedule visualization created")
+
+# 5. Confidence intervals using bootstrap
+try:
+    from sklearn.utils import resample
+    
+    n_bootstraps = 100
+    bootstrap_predictions = np.zeros((n_bootstraps, len(y_test)))
+    
+    # Generate bootstrap predictions
+    for i in range(n_bootstraps):
+        # Sample with replacement
+        indices = resample(range(len(X_test_tensor)), replace=True)
+        X_bootstrap = X_test_tensor[indices]
+        bootstrap_pred = ensemble_predict(models, X_bootstrap)
+        bootstrap_pred = y_scaler.inverse_transform(bootstrap_pred).flatten()
+        bootstrap_predictions[i] = bootstrap_pred
+    
+    # Calculate confidence intervals
+    lower_ci = np.percentile(bootstrap_predictions, 2.5, axis=0)
+    upper_ci = np.percentile(bootstrap_predictions, 97.5, axis=0)
+    
+    # Plot with confidence intervals
+    plt.figure(figsize=(12, 8))
+    plt.fill_between(range(len(y_test)), lower_ci, upper_ci, alpha=0.3, color='blue', label='95% CI')
+    plt.plot(y_pred.flatten(), 'b-', label='Predicted')
+    plt.plot(y_test.values, 'r-', label='Actual')
+    plt.xlabel('Test Sample Index')
+    plt.ylabel('dGmix Value')
+    plt.title('Predictions with 95% Confidence Intervals')
+    plt.legend()
+    plt.savefig(os.path.join(graphs_dir, "confidence_intervals.png"), dpi=300)
+    plt.close()
+    logger.info("Confidence interval visualization created")
+except Exception as e:
+    logger.warning(f"Could not create confidence interval plot: {e}")
+
+# 6. Prediction error vs. actual value
+plt.figure(figsize=(10, 6))
+plt.scatter(y_test.values, errors, alpha=0.6)
+plt.axhline(y=0, color='r', linestyle='--')
+plt.xlabel('Actual Value')
+plt.ylabel('Prediction Error')
+plt.title('Error vs. Actual Value')
+plt.savefig(os.path.join(graphs_dir, "error_vs_actual.png"), dpi=300)
+plt.close()
+logger.info("Error vs actual value visualization created")
+
+# 7. Violin plot of error distribution
+try:
+    import seaborn as sns
+    plt.figure(figsize=(8, 10))
+    sns.violinplot(y=errors)
+    plt.title('Error Distribution (Violin Plot)')
+    plt.ylabel('Prediction Error')
+    plt.savefig(os.path.join(graphs_dir, "error_violin.png"), dpi=300)
+    plt.close()
+    logger.info("Error violin plot created")
+except ImportError:
+    logger.warning("Seaborn not available, skipping violin plot")
 
 # Apple Silicon optimizations
 if torch.backends.mps.is_available():
