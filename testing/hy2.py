@@ -269,7 +269,7 @@ from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter(tb_dir)
 
 # ENHANCED: Advanced training loop with cosine annealing and gradient clipping
-epochs = 3  # Increased epochs
+epochs = 50  # Increased epochs
 batch_size = 64  # Larger batch size for better stability
 best_model_paths = [os.path.join(os.path.dirname(__file__), f"best_hybrid_model_{i}.pt") for i in range(n_models)]
 
