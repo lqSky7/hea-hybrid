@@ -1,102 +1,109 @@
-# QNN FNL
+# Quantum Neural Networks for High Entropy Alloys
 
 ## Overview
 
-This repository implements Quantum Neural Networks (QNN) for financial applications, exploring how quantum computing can enhance machine learning models for financial prediction and analysis. The project leverages quantum circuits to create neural network architectures that may offer advantages in processing complex financial time series data.
+This repository implements **Quantum Neural Networks (QNN)** for predicting **Gibbs free energy** of **High Entropy Alloys (HEAs)**. The project explores how quantum computing can enhance machine learning models for materials science applications, leveraging quantum circuits to create neural network architectures that may offer advantages in processing complex materials data and predicting thermodynamic properties.
 
 ## Features
 
-- Hybrid quantum-classical neural network implementation
-- Financial time series prediction using quantum circuits
+- **Hybrid quantum-classical neural network** implementation
+- Gibbs free energy (dGmix) prediction using quantum circuits
 - Customizable quantum layer architectures
 - Benchmarking tools to compare quantum vs. classical approaches
-- Visualization tools for quantum circuit states and financial predictions
+- Comprehensive visualization tools for model performance analysis
 
 ## Installation
 
 ### Prerequisites
 
-- Python 3.7+
-- PennyLane 0.27+
-- PyTorch 1.10+
-- Qiskit 0.34+ (for IBM quantum backend support)
-- pandas, numpy, matplotlib for data handling and visualization
+**Only** Use Python 3.10 and follow requrements
 
 ### Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/qnn_fnl.git
+git clone https://github.com/lqsky7/qnn_fnl.git
 cd qnn_fnl
 
 # Create a virtual environment (recommended)
-python -m venv venv
+python3.10 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -r requirements/req-hyb.txt
 ```
 
-## Usage
+## Model Results & Visualizations
 
-```python
-# Example code showing how to use your QNN implementation
-from qnn.models import QuantumNeuralNetwork
-from qnn.data import load_financial_dataset
+Our quantum neural network demonstrates promising results in predicting the Gibbs free energy of High Entropy Alloys. Below are key visualizations of model performance:
 
-# Load and preprocess financial data
-train_data, test_data = load_financial_dataset('sp500', start_date='2010-01-01', end_date='2022-12-31')
+### Learning Curves
 
-# Create and train a QNN model
-model = QuantumNeuralNetwork(
-    n_qubits=4,
-    n_layers=2,
-    classical_units=[64, 32],
-    optimizer='adam'
-)
+![Learning Curves](graphs/learning_curves.png)
 
-model.train(train_data, epochs=100, batch_size=32)
-predictions = model.predict(test_data)
+_This graph shows the **training and validation loss** over epochs. The decreasing trend indicates the model is successfully learning the patterns in the HEA data, while the close tracking between training and validation curves suggests good generalization with minimal overfitting._
 
-# Evaluate and visualize results
-model.evaluate(test_data)
-model.plot_predictions(test_data)
-```
+### Actual vs. Predicted (Test Set)
+
+![Actual vs Predicted](graphs/actual_vs_predicted_test.png)
+
+_This plot compares the **actual dGmix values** against the **model predictions** on the test set. The alignment along the diagonal red line indicates high prediction accuracy. The R² value measures how well our model explains the variance in the target variable._
+
+### Error Distribution
+
+![Error Distribution](graphs/error_distribution.png)
+
+_The histogram shows the **distribution of prediction errors** (actual minus predicted values). A distribution centered around zero with narrow spread indicates accurate predictions. The RMSE (Root Mean Squared Error) value quantifies the model's average prediction error._
+
+### Residual Plot
+
+![Residual Plot](graphs/residual_plot.png)
+
+_This plot shows **residuals** (prediction errors) against predicted values. An ideal model shows randomly distributed residuals around the zero line with no discernible pattern, indicating that the model has captured all systematic patterns in the data._
+
+### 3D Surface Plot
+
+![3D Surface Plot](graphs/3d_prediction_surface.png)
+
+_This **3D visualization** shows how the predicted dGmix varies with the two most influential features in the dataset. The surface curvature reveals complex, non-linear relationships between alloy composition parameters and Gibbs free energy that our quantum neural network has learned._
+
+### Overview of All Plots
+
+![Overview Plots](graphs/visualization_overview.png)
+
+_A **composite view** of all visualization tools used to analyze model performance, enabling quick comparison across multiple evaluation metrics._
+
+### Enhanced QNN Results
+
+![Enhanced QNN Results](graphs/qq_plot_errors.png)
+
+_A **comprehensive dashboard** showing model performance across multiple metrics, including training/validation loss, actual vs. predicted values, error distribution, and prediction trends._
+
+## Dataset
+
+This project utilizes a High Entropy Alloy dataset with the following key features:
+
+- **Alloy compositions** (elemental percentages)
+- **Physical properties** (density, melting temperature, etc.)
+- **Thermodynamic parameters** (mixing enthalpy, mixing entropy)
+- **Target variable**: Gibbs free energy of mixing (dGmix)
 
 ## Structure
 
-- `/data`: Contains datasets used for training and testing
+- `/data`: Contains HEA datasets used for training and testing
+- `/graphs`: Visualization outputs for model evaluation
 - `/models`: Pre-trained models and model definition files
-- `/src`: Source code for the QNN implementation
-  - `/src/circuits`: Quantum circuit definitions
-  - `/src/layers`: Neural network layers implementation
-  - `/src/optimizers`: Custom optimizers for quantum-classical training
+- `/training`: Training scripts for QNN implementation
+  - `/training/circuits`: Quantum circuit definitions
+- `/testing`: Testing and evaluation scripts
 - `/notebooks`: Jupyter notebooks with examples and experiments
-- `/docs`: Documentation
-- `/tests`: Unit tests
 
 ## Results
 
-Our quantum neural network implementations show promising results on financial prediction tasks, with particular strength in capturing non-linear patterns in market volatility. The hybrid quantum-classical approach demonstrates up to 15% improvement in certain market conditions compared to classical deep learning baselines.
 
-[For full experiment results, see our documentation in the `/docs` directory]
-
-## Datasets
-
-This project utilizes financial datasets described in:
-
-```
-@article{sezer2020financial,
-  title={Financial Time Series Forecasting with Deep Learning: A Systematic Literature Review: 2005-2019},
-  author={Sezer, Omer Berat and Gudelek, Mehmet Ugur and Ozbayoglu, Ahmet Murat},
-  journal={Applied Soft Computing},
-  volume={90},
-  pages={106181},
-  year={2020},
-  publisher={Elsevier},
-  url={https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3530328}
-}
-```
+- **RMSE**: Measures the average prediction error magnitude
+- **MAE**: Measures the average absolute prediction error
+- **R²**: Indicates how well the model explains variance in the data
 
 ## Contributing
 
@@ -110,22 +117,9 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 ## License
 
-MIT License
-
-## Citation
-
-If you use this code in your research, please cite:
-
-```
-@software{qnn_fnl2023,
-  title={QNN FNL: Quantum Neural Networks for Financial Applications},
-  author={Your Name},
-  year={2023},
-  url={https://github.com/yourusername/qnn_fnl}
-}
-```
+TBD
 
 ## Contact
 
-Your Name - your.email@example.com
-Project Link: [https://github.com/yourusername/qnn_fnl](https://github.com/yourusername/qnn_fnl)
+Your Name - ca5lqsky7@gmail.com
+Project Link: [https://github.com/lqsky7/TBD](https://github.com/yourusername/qnn_fnl)
