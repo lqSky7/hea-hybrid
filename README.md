@@ -62,15 +62,6 @@ qnn_fnl/
 └── models/                 # Saved model files
 ```
 
-## <u>_Performance Metrics_</u>
-
-| _Metric_ | _Value_             |
-| -------- | ------------------- |
-| MSE      | _varies by dataset_ |
-| RMSE     | _varies by dataset_ |
-| MAE      | _varies by dataset_ |
-| R²       | _varies by dataset_ |
-
 ## <u>_Requirements_</u>
 
 - Python 3.8+
