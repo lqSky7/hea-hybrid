@@ -815,9 +815,6 @@ def log_metal_perf():
 # Add Metal performance logging call at the end
 log_metal_perf()
 
-# Additional Metal optimizations for model saving and export
-# ...existing code...
-
 # Final Metal memory cleanup
 if device.type == "mps":
     torch.mps.synchronize()
