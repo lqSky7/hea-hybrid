@@ -9,7 +9,6 @@ import os
 import logging
 import datetime
 
-# Set up logging
 log_dir = os.path.join(os.path.dirname(__file__), "logs")
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
@@ -26,13 +25,12 @@ logging.basicConfig(
 logger = logging.getLogger('deep_nn_trainer')
 
 def load_and_check_data(file_path):
-    """Load CSV data and perform basic checks"""
+    
     logger.info(f"Loading data from {file_path}")
     try:
         df = pd.read_csv(file_path)
         logger.info(f"Data loaded successfully with shape: {df.shape}")
-        
-        # Basic data checks
+
         logger.info(f"Column names: {df.columns.tolist()}")
         logger.info(f"Data sample:\n{df.head()}")
         logger.info(f"Data types:\n{df.dtypes}")
@@ -45,59 +43,48 @@ def load_and_check_data(file_path):
         raise
 
 def preprocess_data(df, target_column):
-    """Preprocess the data with additional feature engineering"""
-    logger.info("Starting data preprocessing with enhanced feature engineering")
     
-    # Separate features and target
+    logger.info("Starting data preprocessing with enhanced feature engineering")
+
     X = df.drop(columns=[target_column])
     y = df[target_column]
     
     logger.info(f"Features shape: {X.shape}, Target shape: {y.shape}")
-    
-    # Identify numeric and categorical columns
+
     numeric_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
     categorical_cols = X.select_dtypes(include=['object', 'category']).columns.tolist()
     
     logger.info(f"Numeric columns: {numeric_cols}")
     logger.info(f"Categorical columns: {categorical_cols}")
-    
-    # Handle categorical columns
+
     if categorical_cols:
         logger.info("Applying one-hot encoding to categorical columns")
         X = pd.get_dummies(X, columns=categorical_cols, drop_first=True)
         logger.info(f"One-hot encoded features shape: {X.shape}")
-    
-    # Feature engineering: Add polynomial features for numeric columns
+
     if numeric_cols and len(numeric_cols) > 0:
         logger.info("Adding polynomial features")
         from sklearn.preprocessing import PolynomialFeatures
-        
-        # Get only numeric columns for polynomial features
+
         X_numeric = X[numeric_cols]
-        
-        # Create polynomial features (degree=2)
+
         poly = PolynomialFeatures(degree=2, include_bias=False)
         poly_features = poly.fit_transform(X_numeric)
-        
-        # Create feature names for polynomial features
+
         poly_feature_names = [f"poly_{i}" for i in range(poly_features.shape[1])]
-        
-        # Convert to DataFrame
+
         poly_df = pd.DataFrame(poly_features, columns=poly_feature_names)
-        
-        # Drop original numeric columns and join with polynomial features
+
         X_without_numeric = X.drop(columns=numeric_cols)
         X = pd.concat([X_without_numeric, poly_df], axis=1)
         
         logger.info(f"Features shape after polynomial transformation: {X.shape}")
-    
-    # Now split the data
+
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
     logger.info(f"Train set: {X_train.shape}, Test set: {X_test.shape}")
-    
-    # Scale features
+
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
@@ -106,23 +93,20 @@ def preprocess_data(df, target_column):
     return X_train_scaled, X_test_scaled, y_train, y_test, scaler
 
 def build_model(input_dim, output_shape=1, is_classification=True):
-    """Build a deep neural network model with improved architecture"""
-    logger.info(f"Building improved model with input dimension {input_dim}")
     
-    # Build an improved model architecture
+    logger.info(f"Building improved model with input dimension {input_dim}")
+
     model = keras.Sequential([
-        # Input layer with enhanced regularization
+
         keras.layers.Dense(256, activation='relu', input_shape=(input_dim,),
                           kernel_regularizer=keras.regularizers.l2(0.001)),
         keras.layers.BatchNormalization(),
         keras.layers.Dropout(0.3),
-        
-        # Deeper architecture with residual-like connections
+
         keras.layers.Dense(128, activation='relu'),
         keras.layers.BatchNormalization(),
         keras.layers.Dropout(0.3),
-        
-        # Additional hidden layers
+
         keras.layers.Dense(64, activation='relu',
                           kernel_regularizer=keras.regularizers.l1_l2(l1=0.0001, l2=0.0001)),
         keras.layers.BatchNormalization(),
@@ -130,15 +114,13 @@ def build_model(input_dim, output_shape=1, is_classification=True):
         
         keras.layers.Dense(32, activation='relu'),
         keras.layers.BatchNormalization(),
-        
-        # Output layer
+
         keras.layers.Dense(output_shape, 
                           activation='sigmoid' if is_classification and output_shape == 1 
                           else 'softmax' if is_classification 
                           else None)
     ])
-    
-    # Compile model with improved configuration
+
     if is_classification:
         model.compile(
             optimizer=keras.optimizers.Adam(learning_rate=0.001),
@@ -146,7 +128,7 @@ def build_model(input_dim, output_shape=1, is_classification=True):
             metrics=['accuracy']
         )
     else:
-        # For regression, use Huber loss which is more robust to outliers than MSE
+
         model.compile(
             optimizer=keras.optimizers.Adam(learning_rate=0.001),
             loss=keras.losses.Huber(), 
@@ -159,26 +141,22 @@ def build_model(input_dim, output_shape=1, is_classification=True):
     return model
 
 def train_model(model, X_train, y_train, X_test, y_test, epochs=100, batch_size=32):
-    """Train the model with improved training process"""
-    logger.info(f"Training model with {epochs} epochs and batch size {batch_size}")
     
-    # Create directories for callbacks
+    logger.info(f"Training model with {epochs} epochs and batch size {batch_size}")
+
     os.makedirs("logs/fit", exist_ok=True)
     os.makedirs("checkpoints", exist_ok=True)
-    
-    # TensorBoard callback
+
     log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-    
-    # Early stopping with increased patience
+
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss',
         patience=20,
         restore_best_weights=True,
         min_delta=0.001
     )
-    
-    # Model checkpoint callback
+
     checkpoint_path = "checkpoints/model_{epoch:02d}_{val_loss:.2f}.keras"
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_path,
@@ -186,8 +164,7 @@ def train_model(model, X_train, y_train, X_test, y_test, epochs=100, batch_size=
         monitor='val_loss',
         verbose=1
     )
-    
-    # Learning rate scheduler
+
     def lr_scheduler(epoch, lr):
         if epoch < 10:
             return lr
@@ -195,16 +172,14 @@ def train_model(model, X_train, y_train, X_test, y_test, epochs=100, batch_size=
             return lr * tf.math.exp(-0.01)
     
     lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
-    
-    # Reduce learning rate on plateau
+
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
         monitor='val_loss', 
         factor=0.2, 
         patience=5, 
         min_lr=0.00001
     )
-    
-    # Train the model
+
     history = model.fit(
         X_train, y_train,
         epochs=epochs,
@@ -218,17 +193,15 @@ def train_model(model, X_train, y_train, X_test, y_test, epochs=100, batch_size=
     return history
 
 def evaluate_model(model, X_test, y_test, is_classification=True):
-    """Evaluate model performance"""
+    
     logger.info("Evaluating model performance")
-    
-    # Evaluate the model - handle multiple metrics
+
     evaluation_results = model.evaluate(X_test, y_test)
-    
-    # Handle different evaluation result formats
+
     if isinstance(evaluation_results, list):
         if len(evaluation_results) >= 2:
             loss = evaluation_results[0]
-            mae = evaluation_results[1]  # First metric is MAE
+            mae = evaluation_results[1]
         else:
             logger.error(f"Unexpected evaluation results format: {evaluation_results}")
             loss, mae = 0, 0
@@ -238,14 +211,11 @@ def evaluate_model(model, X_test, y_test, is_classification=True):
     metric_name = 'accuracy' if is_classification else 'mae'
     logger.info(f"Test loss: {loss:.4f}")
     logger.info(f"Test {metric_name}: {mae:.4f}")
-    
-    # Print accuracy explicitly
+
     print(f"\n{'Accuracy' if is_classification else 'Mean Absolute Error'} of trained model: {mae:.4f}")
-    
-    # Predictions
+
     y_pred = model.predict(X_test)
-    
-    # Save additional metrics based on problem type
+
     if is_classification:
         from sklearn.metrics import classification_report, confusion_matrix
         if len(y_pred.shape) > 1 and y_pred.shape[1] > 1:
@@ -266,16 +236,15 @@ def evaluate_model(model, X_test, y_test, is_classification=True):
         mse = mean_squared_error(y_test, y_pred)
         r2 = r2_score(y_test, y_pred)
         logger.info(f"MAE: {mae:.4f}, MSE: {mse:.4f}, R²: {r2:.4f}")
-        # Print R² metric explicitly for regression
+
         print(f"R² Score: {r2:.4f}")
     
     return y_pred, mae
 
 def plot_history(history, is_classification=True):
-    """Plot training history"""
-    plt.figure(figsize=(12, 5))
     
-    # Plot loss
+    plt.figure(figsize=(12, 5))
+
     plt.subplot(1, 2, 1)
     plt.plot(history.history['loss'], label='Training Loss')
     plt.plot(history.history['val_loss'], label='Validation Loss')
@@ -283,8 +252,7 @@ def plot_history(history, is_classification=True):
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
-    
-    # Plot accuracy/mae
+
     plt.subplot(1, 2, 2)
     metric = 'accuracy' if is_classification else 'mae'
     plt.plot(history.history[metric], label=f'Training {metric}')
@@ -301,21 +269,17 @@ def plot_history(history, is_classification=True):
 def main():
     try:
         logger.info("Starting deep neural network training process")
-        
-        # TODO: Update with your actual CSV file path
+
         file_path = "/Users/ca5/Desktop/qnn_fnl/data_filtered-1.csv"  
         df = load_and_check_data(file_path)
-        
-        # TODO: Update with your target column name
+
         target_column = "dGmix"
-        
-        # Ensure the target column exists
+
         if target_column not in df.columns:
             logger.error(f"Target column '{target_column}' not found in dataset.")
             logger.info(f"Available columns: {df.columns.tolist()}")
             return
-            
-        # Check if target column is numeric
+
         if not pd.api.types.is_numeric_dtype(df[target_column]):
             logger.warning(f"Target column '{target_column}' is not numeric. Converting to numeric.")
             try:
@@ -323,33 +287,25 @@ def main():
             except:
                 logger.error(f"Failed to convert target column '{target_column}' to numeric.")
                 return
-        
-        # TODO: Set based on your problem type (True for classification, False for regression)
-        is_classification = False  # Changed default to False as dGmix sounds like a regression target
-        
-        # Preprocess data
+
+        is_classification = False
+
         X_train, X_test, y_train, y_test, scaler = preprocess_data(df, target_column)
-        
-        # Build model with optimized architecture
+
         input_dim = X_train.shape[1]
-        output_shape = 1  # Change if multi-class classification
+        output_shape = 1
         model = build_model(input_dim, output_shape, is_classification)
-        
-        # Train model with improved training process
+
         history = train_model(model, X_train, y_train, X_test, y_test, epochs=100)
-        
-        # Evaluate model
+
         y_pred, model_accuracy = evaluate_model(model, X_test, y_test, is_classification)
-        
-        # Plot training history
+
         plot_history(history, is_classification)
-        
-        # Save the final model with Keras native format
+
         model_path = "final_model.keras"
         model.save(model_path)
         logger.info(f"Final model saved to {model_path} using native Keras format")
-        
-        # Print final model accuracy
+
         metric_name = 'Accuracy' if is_classification else 'Mean Absolute Error'
         print(f"\nFinal model {metric_name}: {model_accuracy:.4f}")
         print(f"Model saved to: {os.path.abspath(model_path)}")

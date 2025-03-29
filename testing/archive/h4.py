@@ -15,18 +15,16 @@ import io
 
 np.seterr(divide='ignore', invalid='ignore')
 
-# Early Apple Silicon detection and configuration
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 if device.type == "mps":
-    # Enable Metal Performance Shaders acceleration
-    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"  # Enable fallbacks for unsupported ops
-    # Set Metal memory management optimization
-    os.environ["METAL_DEVICE_WRAPPER_TYPE"] = "1"  # Use shared storage mode for better performance
+
+    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
+    os.environ["METAL_DEVICE_WRAPPER_TYPE"] = "1"
     print(f"Apple Silicon detected. Using {device} device with Metal acceleration.")
 else:
     print(f"Using {device} device. Metal acceleration not available.")
 
-# Set up logging
 log_dir = os.path.join(os.path.dirname(__file__), "logs")
 os.makedirs(log_dir, exist_ok=True)
 logging.basicConfig(
@@ -39,46 +37,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger('hybrid_qnn_trainer')
 
-# Load and explore data
 logger.info("Loading dataset...")
 data = pd.read_csv("/Users/ca5/Desktop/qnn_fnl/data_filtered-1.csv")
 logger.info(f"Data shape: {data.shape}")
 logger.info(f"Columns: {data.columns.tolist()}")
 logger.info(f"Sample:\n {data.head()}")
 
-# Check data types and identify categorical columns
 logger.info("\nData types:")
 logger.info(f"{data.dtypes}")
 
-# Identify categorical columns (usually objects or strings)
 categorical_columns = data.select_dtypes(include=['object']).columns.tolist()
 logger.info(f"\nCategorical columns: {categorical_columns}")
 
-# Prepare features and target
 X = data.drop('dGmix', axis=1)
 y = data['dGmix']
 
-# Handle categorical columns
 if categorical_columns:
     X = X.drop(columns=categorical_columns)
     logger.info(f"After dropping categorical columns: {X.shape} features")
 
-# ENHANCED: Advanced feature engineering
 logger.info("Performing advanced feature engineering...")
 
-# Add polynomial features with higher degree for better feature interactions
 numeric_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
 if numeric_cols:
     logger.info("Adding polynomial features (degree=3)")
     poly = PolynomialFeatures(degree=3, include_bias=False, interaction_only=False)
     X_poly = poly.fit_transform(X)
     logger.info(f"Features shape after polynomial transformation: {X_poly.shape}")
-    
-    # Add log and reciprocal transformations for selected features
+
     X_orig = pd.DataFrame(X)
     log_features = []
     for col in X_orig.columns:
-        # Only transform positive columns
+
         if (X_orig[col] > 0).all():
             col_name = f"log_{col}"
             log_features.append(np.log1p(X_orig[col]).values)
@@ -93,72 +83,62 @@ if numeric_cols:
 else:
     logger.warning("No numeric columns found for polynomial features")
 
-# Split data with stratification to ensure similar distributions
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42)
 logger.info(f"Train set: {X_train.shape}, Test set: {X_test.shape}")
 
-# ENHANCED: Robust scaling to handle outliers
 from sklearn.preprocessing import RobustScaler
 feature_scaler = RobustScaler()
 X_train_scaled = feature_scaler.fit_transform(X_train)
 X_test_scaled = feature_scaler.transform(X_test)
 logger.info("Data scaling completed with RobustScaler")
 
-# Target scaling - use regular StandardScaler for target
 y_scaler = StandardScaler()
 y_train_scaled = y_scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
 y_test_scaled = y_scaler.transform(y_test.values.reshape(-1, 1)).flatten()
 logger.info("Target scaling completed")
 
-# ENHANCED: More qubits and layers for quantum circuit
-n_qubits = min(12, X.shape[1])  # Increased from 8 to 12
-n_layers = 5  # Increased from 3 to 5
+n_qubits = min(12, X.shape[1])
+n_layers = 5
 dev = qml.device("default.qubit", wires=n_qubits)
 
 @qml.qnode(dev)
 def quantum_circuit(inputs, weights):
-    # Enhanced amplitude encoding of normalized inputs
+
     inputs_padded = np.pad(inputs, (0, n_qubits - len(inputs) % n_qubits), mode='constant')
     for i in range(n_qubits):
         qml.RY(inputs_padded[i % len(inputs_padded)] * np.pi, wires=i)
-    
-    # Multiple layers of parameterized gates and entanglement
+
     for l in range(n_layers):
-        # Rotation layer with more gates
+
         for i in range(n_qubits):
             qml.RX(weights[l, i, 0], wires=i)
             qml.RY(weights[l, i, 1], wires=i)
             qml.RZ(weights[l, i, 2], wires=i)
-            # Add U3 gate for more expressivity
+
             qml.U3(weights[l, i, 0], weights[l, i, 1], weights[l, i, 2], wires=i)
-        
-        # Enhanced entanglement layer - more complex pattern
-        if l % 2 == 0:  # Even layers - nearest neighbors
+
+        if l % 2 == 0:
             for i in range(n_qubits-1):
                 qml.CNOT(wires=[i, i+1])
-            # Connect first and last for periodic boundary
+
             qml.CNOT(wires=[n_qubits-1, 0])
-        else:  # Odd layers - long-range connections
+        else:
             for i in range(0, n_qubits, 2):
                 qml.CNOT(wires=[i, (i + n_qubits//2) % n_qubits])
-    
-    # Enhanced measurement strategy
+
     expectations = [qml.expval(qml.PauliZ(i)) for i in range(n_qubits)]
     expectations += [qml.expval(qml.PauliX(i)) for i in range(n_qubits//2)]
     return expectations
 
-# ENHANCED: Deeper Hybrid Model with residual connections
 class AdvancedHybridModel(nn.Module):
     def __init__(self, n_features, n_qubits, n_layers=5):
         super(AdvancedHybridModel, self).__init__()
         self.n_qubits = n_qubits
         self.n_layers = n_layers
-        
-        # Number of quantum outputs
+
         self.q_output_size = n_qubits + n_qubits//2
-        
-        # Pre quantum network - much deeper with residual connections
+
         self.pre_net1 = nn.Sequential(
             nn.Linear(n_features, 256),
             nn.BatchNorm1d(256),
@@ -182,13 +162,11 @@ class AdvancedHybridModel(nn.Module):
         
         self.pre_out = nn.Sequential(
             nn.Linear(64, n_qubits),
-            nn.Tanh()  # Constrain to [-1, 1] for quantum circuit
+            nn.Tanh()
         )
-        
-        # Quantum circuit weights
+
         self.q_weights = nn.Parameter(torch.randn(n_layers, n_qubits, 3) * 0.1)
-        
-        # Post quantum network - deeper with residual connections
+
         self.post_net1 = nn.Sequential(
             nn.Linear(self.q_output_size, 128),
             nn.BatchNorm1d(128),
@@ -208,57 +186,48 @@ class AdvancedHybridModel(nn.Module):
             nn.LeakyReLU(),
             nn.Linear(32, 1)
         )
-        
-        # Skip connection for original features
+
         self.skip_connection = nn.Linear(n_features, 128)
     
     def forward(self, x):
         batch_size = x.shape[0]
-        
-        # Move original input to device for skip connection
+
         x = x.to(device)
-        
-        # Skip connection
+
         skip = self.skip_connection(x)
-        
-        # Pre-processing with classical network and residual connections
+
         x1 = self.pre_net1(x)
         x2 = self.pre_net2(x1)
-        x3 = self.pre_net3(x2) + 0.1 * x1[:, :64]  # Partial residual connection
+        x3 = self.pre_net3(x2) + 0.1 * x1[:, :64]
         x_pre = self.pre_out(x3)
-        
-        # Quantum processing with batched output - move to CPU for quantum circuit
+
         q_out = torch.zeros(batch_size, self.q_output_size, device=device)
         for i, inputs in enumerate(x_pre):
             q_result = quantum_circuit(inputs.detach().cpu().numpy(), 
                                      self.q_weights.detach().cpu().numpy())
             q_out[i] = torch.tensor(q_result, device=device)
-        
-        # Post-processing with residual connections
+
         p1 = self.post_net1(q_out)
-        p1 = p1 + skip  # Skip connection from original features
+        p1 = p1 + skip
         p2 = self.post_net2(p1)
         out = self.post_out(p2)
         
         return out
 
-# Convert to tensors and move to MPS device
 X_train_tensor = torch.FloatTensor(X_train_scaled).to(device)
 y_train_tensor = torch.FloatTensor(y_train_scaled).reshape(-1, 1).to(device)
 X_test_tensor = torch.FloatTensor(X_test_scaled).to(device)
 y_test_tensor = torch.FloatTensor(y_test_scaled).reshape(-1, 1).to(device)
 
-# ENHANCED: Implement an ensemble of models for better performance
-n_models = 3  # Create an ensemble of 3 models
+n_models = 3
 models = []
 
 for i in range(n_models):
-    # Initialize advanced model and move to device
+
     model = AdvancedHybridModel(X_train_scaled.shape[1], n_qubits, n_layers).to(device)
     models.append(model)
     logger.info(f"Initialized model {i+1} of {n_models} in ensemble on {device}")
 
-# ENHANCED: Huber Loss for robustness to outliers
 class HuberLoss(nn.Module):
     def __init__(self, delta=1.0):
         super(HuberLoss, self).__init__()
@@ -271,26 +240,22 @@ class HuberLoss(nn.Module):
         loss = 0.5 * quadratic**2 + self.delta * linear
         return torch.mean(loss)
 
-# Initialize loss and optimizers
 criterion = HuberLoss(delta=1.0)
 optimizers = [optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4) for model in models]
 schedulers = [optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, factor=0.5, verbose=True) 
               for optimizer in optimizers]
 
-# Create Tensorboard directory 
 tb_dir = os.path.join(log_dir, "tensorboard", datetime.now().strftime("%Y%m%d-%H%M%S"))
 os.makedirs(tb_dir, exist_ok=True)
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter(tb_dir)
 
-# ENHANCED: Advanced training loop with cosine annealing and gradient clipping
-epochs = 25  # Increased epochs
-batch_size = 64  # Larger batch size for better stability
+epochs = 25
+batch_size = 64
 best_model_paths = [os.path.join(os.path.dirname(__file__), f"best_hybrid_model_{i}.pt") for i in range(n_models)]
 
 logger.info(f"Starting ensemble training with {n_models} models for {epochs} epochs")
 
-# Train each model in the ensemble
 for model_idx, (model, optimizer, scheduler, best_model_path) in enumerate(zip(models, optimizers, schedulers, best_model_paths)):
     logger.info(f"Training model {model_idx+1} of {n_models} on {device}")
     
@@ -299,13 +264,11 @@ for model_idx, (model, optimizer, scheduler, best_model_path) in enumerate(zip(m
     best_val_loss = float('inf')
     patience = 20
     patience_counter = 0
-    
-    # Metal-optimized batch processing
+
     for epoch in range(epochs):
         model.train()
         epoch_loss = 0
-        
-        # Mini-batch training with shuffle
+
         indices = torch.randperm(len(X_train_tensor), device=device)
         
         for start_idx in range(0, len(indices), batch_size):
@@ -318,39 +281,32 @@ for model_idx, (model, optimizer, scheduler, best_model_path) in enumerate(zip(m
             outputs = model(batch_X)
             loss = criterion(outputs, batch_y)
             loss.backward()
-            
-            # Gradient clipping to prevent exploding gradients
+
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             
             optimizer.step()
-            
-            # Metal-optimized memory management
+
             if device.type == "mps":
-                # Explicit synchronization to avoid memory buildup
+
                 torch.mps.synchronize()
                 
             epoch_loss += loss.item()
-        
-        # Validation step
+
         model.eval()
         with torch.no_grad():
             val_outputs = model(X_test_tensor)
             val_loss = criterion(val_outputs, y_test_tensor).item()
-        
-        # Store losses
+
         avg_epoch_loss = epoch_loss / (len(X_train_tensor) // batch_size + 1)
         losses.append(avg_epoch_loss)
         val_losses.append(val_loss)
-        
-        # Tensorboard logging
+
         writer.add_scalar(f'Loss/train/model_{model_idx}', avg_epoch_loss, epoch)
         writer.add_scalar(f'Loss/validation/model_{model_idx}', val_loss, epoch)
         writer.add_scalar(f'LearningRate/model_{model_idx}', optimizer.param_groups[0]['lr'], epoch)
-        
-        # Learning rate scheduling
+
         scheduler.step(val_loss)
-        
-        # Early stopping check with longer patience
+
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
@@ -364,46 +320,38 @@ for model_idx, (model, optimizer, scheduler, best_model_path) in enumerate(zip(m
         
         if (epoch+1) % 5 == 0 or epoch == 0:
             logger.info(f'Model {model_idx+1}: Epoch [{epoch+1}/{epochs}], Train Loss: {avg_epoch_loss:.6f}, Val Loss: {val_loss:.6f}')
-        
-        # Force garbage collection for Metal memory management
+
         if device.type == "mps":
-            # Synchronize to ensure all operations are complete
+
             torch.mps.synchronize()
-            # Release any cached memory
+
             torch.mps.empty_cache()
 
-# Load best models
 for i, (model, best_model_path) in enumerate(zip(models, best_model_paths)):
     model.load_state_dict(torch.load(best_model_path))
     logger.info(f"Loaded best model {i+1} from {best_model_path}")
 
-# ENHANCED: Ensemble predictions for better accuracy
 def ensemble_predict(models, X):
     predictions = []
     for model in models:
         model.eval()
         with torch.no_grad():
-            # Ensure data is on the right device
+
             if X.device != next(model.parameters()).device:
                 X = X.to(next(model.parameters()).device)
             pred = model(X).cpu().numpy()
             predictions.append(pred)
-            
-            # Clean up Metal memory
+
             if device.type == "mps":
                 torch.mps.synchronize()
-    
-    # Average the predictions
+
     ensemble_pred = np.mean(predictions, axis=0)
     return ensemble_pred
 
-# Make ensemble predictions
 y_pred_scaled = ensemble_predict(models, X_test_tensor)
 
-# Convert scaled predictions back to original scale
 y_pred = y_scaler.inverse_transform(y_pred_scaled)
 
-# Calculate metrics
 mse = mean_squared_error(y_test.values, y_pred)
 rmse = np.sqrt(mse)
 mae = mean_absolute_error(y_test.values, y_pred)
@@ -414,15 +362,12 @@ logger.info(f'Ensemble Test RMSE: {rmse:.4f}')
 logger.info(f'Ensemble Test MAE: {mae:.4f}')
 logger.info(f'Ensemble Test R²: {r2:.4f}')
 
-# New visualization code starts here
-
 import glob
-# Use an absolute path for saving graphs
+
 graphs_dir = "/Users/ca5/Desktop/qnn_fnl/graphs"
 os.makedirs(graphs_dir, exist_ok=True)
 logger.info(f"Graphs will be saved to: {graphs_dir}")
 
-# 1. Learning Curves Plot
 fig1 = plt.figure(figsize=(10,6))
 plt.plot(losses, label='Train Loss')
 plt.plot(val_losses, label='Validation Loss')
@@ -433,7 +378,6 @@ plt.legend()
 plt.savefig(os.path.join(graphs_dir, "learning_curves.png"), dpi=300)
 plt.close(fig1)
 
-# 2. Actual vs Predicted (Test Set)
 fig2 = plt.figure(figsize=(8,8))
 plt.scatter(y_test, y_pred, alpha=0.6)
 plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--')
@@ -443,7 +387,6 @@ plt.title(f'Actual vs Predicted (Test), R²: {r2:.4f}')
 plt.savefig(os.path.join(graphs_dir, "actual_vs_predicted_test.png"), dpi=300)
 plt.close(fig2)
 
-# 3. Error Distribution Histogram
 error_vals = y_pred.flatten() - y_test.values.flatten()
 fig3 = plt.figure(figsize=(10,6))
 plt.hist(error_vals, bins=30, alpha=0.7)
@@ -453,7 +396,6 @@ plt.title(f'Error Distribution, RMSE: {rmse:.4f}')
 plt.savefig(os.path.join(graphs_dir, "error_distribution.png"), dpi=300)
 plt.close(fig3)
 
-# 4. Residual Plot
 fig4 = plt.figure(figsize=(10,6))
 plt.scatter(y_pred.flatten(), error_vals, alpha=0.6)
 plt.axhline(0, color='red', linestyle='--')
@@ -463,11 +405,10 @@ plt.title('Residual Plot')
 plt.savefig(os.path.join(graphs_dir, "residual_plot.png"), dpi=300)
 plt.close(fig4)
 
-# 5. 3D Surface Plot Using Two Top Features (if available)
 if X_test_scaled.shape[1] >= 2:
     try:
         from mpl_toolkits.mplot3d import Axes3D
-        # Compute absolute correlations for each feature
+
         importance = [np.abs(np.corrcoef(X_train[:, i], y_train_scaled)[0, 1])
                       for i in range(X_train.shape[1])]
         top_two_idx = np.argsort(importance)[-2:]
@@ -476,7 +417,7 @@ if X_test_scaled.shape[1] >= 2:
         y_range = np.linspace(np.min(X_test_scaled[:, top_two_idx[1]]),
                               np.max(X_test_scaled[:, top_two_idx[1]]), 50)
         xx, yy = np.meshgrid(x_range, y_range)
-        # Prepare inputs: fill grid with mean for all features, update two dimensions
+
         grid = np.tile(np.mean(X_test_scaled, axis=0), (xx.size, 1))
         grid[:, top_two_idx[0]] = xx.ravel()
         grid[:, top_two_idx[1]] = yy.ravel()
@@ -497,7 +438,6 @@ if X_test_scaled.shape[1] >= 2:
     except Exception as e:
         logger.warning(f"Failed to generate 3D surface plot: {e}")
 
-# 6. Overview of All Saved Plots
 png_files = glob.glob(os.path.join(graphs_dir, "*.png"))
 fig6 = plt.figure(figsize=(12,12))
 for i, file in enumerate(png_files):
@@ -512,10 +452,8 @@ plt.close(fig6)
 
 logger.info("All graphs created and saved.")
 
-# Enhanced visualization
 plt.figure(figsize=(15, 10))
 
-# Plot training and validation loss
 plt.subplot(2, 2, 1)
 plt.plot(losses, label='Training Loss')
 plt.plot(val_losses, label='Validation Loss')
@@ -524,7 +462,6 @@ plt.ylabel('Loss')
 plt.title('Training and Validation Loss')
 plt.legend()
 
-# Plot actual vs predicted
 plt.subplot(2, 2, 2)
 plt.scatter(y_test, y_pred, alpha=0.5)
 plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--')
@@ -532,7 +469,6 @@ plt.xlabel('Actual dGmix')
 plt.ylabel('Predicted dGmix')
 plt.title(f'Prediction vs Actual (R²: {r2:.4f})')
 
-# Plot error distribution
 plt.subplot(2, 2, 3)
 errors = y_pred.flatten() - y_test.values
 plt.hist(errors, bins=25)
@@ -540,7 +476,6 @@ plt.xlabel('Prediction Error')
 plt.ylabel('Frequency')
 plt.title(f'Error Distribution (RMSE: {rmse:.4f})')
 
-# Plot learning curve
 plt.subplot(2, 2, 4)
 plt.plot(y_test.values, label='Actual')
 plt.plot(y_pred.flatten(), label='Predicted')
@@ -553,10 +488,8 @@ plt.tight_layout()
 plt.savefig('/Users/ca5/Desktop/qnn_fnl/enhanced_qnn_results.png', dpi=300)
 logger.info("Results visualization saved to '/Users/ca5/Desktop/qnn_fnl/enhanced_qnn_results.png'")
 
-# Additional advanced visualizations
 logger.info("Generating additional advanced visualization graphs...")
 
-# 1. Q-Q Plot to check normality of residuals
 from scipy import stats
 plt.figure(figsize=(10, 6))
 stats.probplot(errors, plot=plt)
@@ -565,15 +498,13 @@ plt.savefig(os.path.join(graphs_dir, "qq_plot_residuals.png"), dpi=300)
 plt.close()
 logger.info("Q-Q plot generated to check normality of residuals")
 
-# 2. Feature importance visualization
-if X_train.shape[1] <= 20:  # Only for reasonable number of features
+if X_train.shape[1] <= 20:
     try:
-        # Calculate feature importance based on correlation with target
+
         importances = np.zeros(X_train.shape[1])
         for i in range(X_train.shape[1]):
             importances[i] = abs(np.corrcoef(X_train[:, i], y_train_scaled)[0, 1])
-        
-        # Sort features by importance
+
         indices = np.argsort(importances)[::-1]
         
         plt.figure(figsize=(12, 8))
@@ -589,9 +520,8 @@ if X_train.shape[1] <= 20:  # Only for reasonable number of features
     except Exception as e:
         logger.warning(f"Could not create feature importance plot: {e}")
 
-# 3. Visualize individual model predictions in the ensemble
 plt.figure(figsize=(12, 8))
-X_subset = X_test_tensor[:100]  # Use subset for clearer visualization
+X_subset = X_test_tensor[:100]
 y_subset = y_test.values[:100]
 
 for i, model in enumerate(models):
@@ -610,7 +540,6 @@ plt.savefig(os.path.join(graphs_dir, "ensemble_predictions.png"), dpi=300)
 plt.close()
 logger.info("Ensemble predictions visualization created")
 
-# 4. Learning rate over epochs visualization
 plt.figure(figsize=(10, 6))
 for i, scheduler in enumerate(schedulers):
     lr_history = []
@@ -625,27 +554,23 @@ plt.savefig(os.path.join(graphs_dir, "learning_rate_schedule.png"), dpi=300)
 plt.close()
 logger.info("Learning rate schedule visualization created")
 
-# 5. Confidence intervals using bootstrap
 try:
     from sklearn.utils import resample
     
     n_bootstraps = 100
     bootstrap_predictions = np.zeros((n_bootstraps, len(y_test)))
-    
-    # Generate bootstrap predictions
+
     for i in range(n_bootstraps):
-        # Sample with replacement
+
         indices = resample(range(len(X_test_tensor)), replace=True)
         X_bootstrap = X_test_tensor[indices]
         bootstrap_pred = ensemble_predict(models, X_bootstrap)
         bootstrap_pred = y_scaler.inverse_transform(bootstrap_pred).flatten()
         bootstrap_predictions[i] = bootstrap_pred
-    
-    # Calculate confidence intervals
+
     lower_ci = np.percentile(bootstrap_predictions, 2.5, axis=0)
     upper_ci = np.percentile(bootstrap_predictions, 97.5, axis=0)
-    
-    # Plot with confidence intervals
+
     plt.figure(figsize=(12, 8))
     plt.fill_between(range(len(y_test)), lower_ci, upper_ci, alpha=0.3, color='blue', label='95% CI')
     plt.plot(y_pred.flatten(), 'b-', label='Predicted')
@@ -660,7 +585,6 @@ try:
 except Exception as e:
     logger.warning(f"Could not create confidence interval plot: {e}")
 
-# 6. Prediction error vs. actual value
 plt.figure(figsize=(10, 6))
 plt.scatter(y_test.values, errors, alpha=0.6)
 plt.axhline(y=0, color='r', linestyle='--')
@@ -671,7 +595,6 @@ plt.savefig(os.path.join(graphs_dir, "error_vs_actual.png"), dpi=300)
 plt.close()
 logger.info("Error vs actual value visualization created")
 
-# 7. Violin plot of error distribution
 try:
     import seaborn as sns
     plt.figure(figsize=(8, 10))
@@ -684,40 +607,34 @@ try:
 except ImportError:
     logger.warning("Seaborn not available, skipping violin plot")
 
-# Apple Silicon optimizations
 if torch.backends.mps.is_available():
     logger.info("Apple Silicon detected. Enabling MPS optimizations.")
-    # Enable Metal Performance Shaders acceleration
+
     device = torch.device("mps")
-    
-    # Optimize models for Apple Silicon
+
     for i, model in enumerate(models):
         models[i] = model.to(device)
-        
-    # Export to CoreML for even better performance on Apple devices
+
     try:
         import coremltools as ct
-        # Function to convert a single model to CoreML
+
         def export_to_coreml(model, idx):
-            # Trace the model with example input
+
             example_input = torch.rand(1, X_train_scaled.shape[1], device=device)
             traced_model = torch.jit.trace(model, example_input)
-            
-            # Convert to CoreML
+
             mlmodel = ct.convert(
                 traced_model,
                 inputs=[ct.TensorType(shape=example_input.shape)]
             )
-            
-            # Save the model
+
             coreml_path = f'/Users/ca5/Desktop/qnn_fnl/qnn_model_{idx}.mlmodel'
             mlmodel.save(coreml_path)
             logger.info(f"Model {idx} exported to CoreML: {coreml_path}")
-            
-        # Try to export each model
+
         for idx, model in enumerate(models):
             try:
-                model.eval()  # Set to evaluation mode
+                model.eval()
                 export_to_coreml(model, idx)
             except Exception as e:
                 logger.warning(f"CoreML export failed for model {idx}: {e}")
@@ -728,21 +645,18 @@ if torch.backends.mps.is_available():
 else:
     logger.info("MPS acceleration not available. Using CPU.")
     device = torch.device("cpu")
-    
-    # Optimize for CPU-based execution on Apple Silicon
+
     import multiprocessing
     cpu_count = multiprocessing.cpu_count()
     logger.info(f"Setting PyTorch to use {cpu_count} CPU cores")
     torch.set_num_threads(cpu_count)
-    
-    # Set OMP threads for better CPU performance
+
     import os
     os.environ["OMP_NUM_THREADS"] = str(cpu_count)
     os.environ["MKL_NUM_THREADS"] = str(cpu_count)
 
-# Save model and metadata with device information
 model_info = {
-    'model_state': [model.cpu().state_dict() for model in models],  # Store CPU state dicts
+    'model_state': [model.cpu().state_dict() for model in models],
     'scaler_state': {
         'feature_scaler_center': feature_scaler.center_,
         'feature_scaler_scale': feature_scaler.scale_,
@@ -767,7 +681,6 @@ model_info = {
     }
 }
 
-# Use memory-efficient saving for large models
 buffer = io.BytesIO()
 torch.save(model_info, buffer, _use_new_zipfile_serialization=True)
 buffer.seek(0)
@@ -777,45 +690,38 @@ with open('/Users/ca5/Desktop/qnn_fnl/enhanced_hybrid_qnn_model.pt', 'wb') as f:
 
 logger.info("Enhanced model saved with Apple Silicon optimizations to '/Users/ca5/Desktop/qnn_fnl/enhanced_hybrid_qnn_model.pt'")
 
-# Memory cleanup
 import gc
 gc.collect()
 if torch.backends.mps.is_available():
     torch.mps.empty_cache()
 
-# Add Metal-optimized visualization pipeline
-# For matplotlib visualizations on Metal GPU
 try:
-    # Check for Metal-accelerated matplotlib backend
+
     import platform
     if platform.system() == 'Darwin' and platform.processor() == 'arm':
-        # Use Metal accelerated backend if available
+
         import matplotlib
-        matplotlib.use('AGG')  # AGG is often faster with Metal
+        matplotlib.use('AGG')
         logger.info("Using optimized matplotlib backend for Apple Silicon")
 except:
     pass
 
-# Add new Metal performance monitoring
 def log_metal_perf():
     if device.type == "mps":
         import subprocess
         try:
-            # Get GPU utilization on Mac using system_profiler
+
             cmd = "system_profiler SPDisplaysDataType | grep 'Metal Support'"
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
             logger.info(f"Metal Support: {result.stdout.strip()}")
-            
-            # Log memory usage
-            memory_used = torch.mps.current_allocated_memory() / (1024 ** 3)  # in GB
+
+            memory_used = torch.mps.current_allocated_memory() / (1024 ** 3)
             logger.info(f"MPS Memory Usage: {memory_used:.2f} GB")
         except Exception as e:
             logger.warning(f"Failed to get Metal performance metrics: {e}")
 
-# Add Metal performance logging call at the end
 log_metal_perf()
 
-# Final Metal memory cleanup
 if device.type == "mps":
     torch.mps.synchronize()
     torch.mps.empty_cache()

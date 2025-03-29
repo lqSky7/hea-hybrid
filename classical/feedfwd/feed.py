@@ -1,4 +1,4 @@
-# /Users/ca5/Desktop/qnn_fnl/fnn_train.py
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,23 +10,19 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-# Load and preprocess data
 def load_data(file_path):
     df = pd.read_csv(file_path)
-    # Drop object columns
+
     df = df.select_dtypes(exclude=['object'])
-    
-    # Check if dGmix exists in the dataframe
+
     if 'dGmix' not in df.columns:
         raise ValueError("Target variable 'dGmix' not found in dataset")
-    
-    # Separate features and target
+
     X = df.drop('dGmix', axis=1)
     y = df['dGmix']
     
     return X, y
 
-# Create a custom dataset class
 class ChemDataset(Dataset):
     def __init__(self, X, y, scaler=None):
         if scaler is not None:
@@ -41,17 +37,16 @@ class ChemDataset(Dataset):
     def __getitem__(self, idx):
         return torch.FloatTensor(self.X[idx]), torch.FloatTensor(self.y[idx])
 
-# Define the neural network with further reduced capacity
 class FeedForwardNN(nn.Module):
     def __init__(self, input_size):
         super(FeedForwardNN, self).__init__()
-        # Further reduced neuron count from 32 to 16 in first layer
+
         self.fc1 = nn.Linear(input_size, 16)
-        # Further reduced neuron count from 16 to 8 in second layer
+
         self.fc2 = nn.Linear(16, 8)
         self.fc3 = nn.Linear(8, 1)
         self.relu = nn.ReLU()
-        # Increased dropout rate from 0.3 to 0.5 to further increase randomness
+
         self.dropout1 = nn.Dropout(0.5)
         self.dropout2 = nn.Dropout(0.5)
         
@@ -63,13 +58,12 @@ class FeedForwardNN(nn.Module):
         x = self.fc3(x)
         return x
 
-# Function to train the model
 def train_model(model, train_loader, test_loader, criterion, optimizer, epochs=25):
     train_losses = []
     test_losses = []
     
     for epoch in range(epochs):
-        # Training
+
         model.train()
         running_loss = 0.0
         for inputs, targets in train_loader:
@@ -82,8 +76,7 @@ def train_model(model, train_loader, test_loader, criterion, optimizer, epochs=2
         
         train_loss = running_loss / len(train_loader)
         train_losses.append(train_loss)
-        
-        # Testing
+
         model.eval()
         test_loss = 0.0
         with torch.no_grad():
@@ -94,20 +87,17 @@ def train_model(model, train_loader, test_loader, criterion, optimizer, epochs=2
         
         test_loss = test_loss / len(test_loader)
         test_losses.append(test_loss)
-        
-        # Print progress
+
         if (epoch + 1) % 10 == 0:
             print(f'Epoch {epoch+1}/{epochs}, Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}')
     
     return train_losses, test_losses
 
-# Function to make predictions with confidence intervals
 def predict_with_confidence(model, test_loader, num_samples=100):
     model.eval()
     all_preds = []
     all_targets = []
-    
-    # Enable dropout during inference for Monte Carlo dropout
+
     def enable_dropout(model):
         for m in model.modules():
             if m.__class__.__name__.startswith('Dropout'):
@@ -121,8 +111,7 @@ def predict_with_confidence(model, test_loader, num_samples=100):
             for _ in range(num_samples):
                 outputs = model(inputs)
                 batch_predictions.append(outputs.numpy())
-            
-            # Stack predictions
+
             batch_preds = np.stack(batch_predictions, axis=0)
             mean_preds = np.mean(batch_preds, axis=0)
             
@@ -131,17 +120,14 @@ def predict_with_confidence(model, test_loader, num_samples=100):
     
     return np.array(all_preds).flatten(), np.array(all_targets).flatten()
 
-# Function to plot actual vs predicted
 def plot_actual_vs_predicted(y_true, y_pred, output_path, metrics=None):
     plt.figure(figsize=(10, 6))
     plt.scatter(y_true, y_pred, alpha=0.5)
-    
-    # Add perfect prediction line
+
     min_val = min(y_true.min(), y_pred.min())
     max_val = max(y_true.max(), y_pred.max())
     plt.plot([min_val, max_val], [min_val, max_val], 'r--')
-    
-    # Add metrics to the plot if provided
+
     if metrics:
         metrics_text = f"R² = {metrics['r2']:.4f}\nMAE = {metrics['mae']:.4f}\nMSE = {metrics['mse']:.4f}\nRMSE = {metrics['rmse']:.4f}"
         plt.annotate(metrics_text, xy=(0.05, 0.95), xycoords='axes fraction', 
@@ -155,14 +141,12 @@ def plot_actual_vs_predicted(y_true, y_pred, output_path, metrics=None):
     plt.savefig(output_path)
     plt.close()
 
-# Function to plot confidence intervals
 def plot_confidence_intervals(y_true, y_pred, output_path, metrics=None):
-    # Sort by true values for better visualization
+
     sorted_indices = np.argsort(y_true)
     y_true_sorted = y_true[sorted_indices]
     y_pred_sorted = y_pred[sorted_indices]
-    
-    # Calculate simple error as a pseudo confidence interval
+
     error = np.abs(y_true_sorted - y_pred_sorted)
     
     plt.figure(figsize=(12, 6))
@@ -172,8 +156,7 @@ def plot_confidence_intervals(y_true, y_pred, output_path, metrics=None):
                      y_pred_sorted - error, 
                      y_pred_sorted + error, 
                      color='gray', alpha=0.3, label='Error Margin')
-    
-    # Add metrics to the plot if provided
+
     if metrics:
         metrics_text = f"R² = {metrics['r2']:.4f}\nMAE = {metrics['mae']:.4f}\nMSE = {metrics['mse']:.4f}\nRMSE = {metrics['rmse']:.4f}"
         plt.annotate(metrics_text, xy=(0.05, 0.95), xycoords='axes fraction', 
@@ -188,7 +171,6 @@ def plot_confidence_intervals(y_true, y_pred, output_path, metrics=None):
     plt.savefig(output_path)
     plt.close()
 
-# Function to calculate and print evaluation metrics
 def calculate_metrics(y_true, y_pred):
     mae = mean_absolute_error(y_true, y_pred)
     mse = mean_squared_error(y_true, y_pred)
@@ -205,39 +187,32 @@ def calculate_metrics(y_true, y_pred):
 
 def main():
     try:
-        # Adjust this path to your data file
+
         file_path = '/Users/ca5/Desktop/qnn_fnl/data_filtered-1.csv'
-        
-        # Load and prepare data
+
         X, y = load_data(file_path)
-        
-        # Split the data
+
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        
-        # Scale the features
+
         scaler = StandardScaler()
         scaler.fit(X_train)
-        
-        # Create datasets and dataloaders
+
         train_dataset = ChemDataset(X_train, y_train, scaler)
         test_dataset = ChemDataset(X_test, y_test, scaler)
         
         train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-        
-        # Initialize model, loss function, and optimizer
+
         input_size = X.shape[1]
         model = FeedForwardNN(input_size)
         
         criterion = nn.MSELoss()
 
         optimizer = optim.Adam(model.parameters(), lr=0.05)
-        
 
         print("Training model...")
         train_losses, test_losses = train_model(model, train_loader, test_loader, criterion, optimizer, epochs=25)
-        
-        # Plot training curves
+
         plt.figure(figsize=(10, 6))
         plt.plot(train_losses, label='Training Loss')
         plt.plot(test_losses, label='Testing Loss')
@@ -248,22 +223,17 @@ def main():
         plt.grid(True)
         plt.savefig('/Users/ca5/Desktop/qnn_fnl/training_loss.png')
         plt.close()
-        
-        # Get predictions with confidence
+
         print("Generating predictions...")
         y_pred, y_true = predict_with_confidence(model, test_loader)
-        
-        # Calculate and display evaluation metrics
+
         metrics = calculate_metrics(y_true, y_pred)
-        
-        # Save metrics to file
+
         metrics_df = pd.DataFrame([metrics])
         metrics_df.to_csv('/Users/ca5/Desktop/qnn_fnl/classical/feedfwd/feed_model_metrics.csv', index=False)
-        
-        # Plot actual vs predicted with metrics
+
         plot_actual_vs_predicted(y_true, y_pred, '/Users/ca5/Desktop/qnn_fnl/classical/feedfwd/actual_vs_predicted_test.png', metrics)
-        
-        # Plot confidence intervals with metrics
+
         plot_confidence_intervals(y_true, y_pred, '/Users/ca5/Desktop/qnn_fnl/classical/feedfwd/hybrid-confidence_intervals.png', metrics)
         
         print("Done! Check the output directory for plots and metrics.")
