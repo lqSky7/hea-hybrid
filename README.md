@@ -1,4 +1,6 @@
-# Quantum Neural Network (QNN) for Material Properties Prediction
+# Hybrid Quantum Neural Network for dGmix Prediction
+
+This project uses TensorFlow Quantum to train a hybrid quantum-classical neural network for predicting dGmix values from the provided dataset.
 
 ## <u>_Overview_</u>
 
@@ -61,7 +63,7 @@ qnn_fnl/
 │   └── tensorboard/        # TensorBoard logs
 └── models/                 # Saved model files
 ```
-w
+
 ## <u>_Requirements_</u>
 
 - Python 3.8+
@@ -70,6 +72,36 @@ w
 - scikit-learn 1.0+
 - pandas, numpy, matplotlib
 - _Optional_: coremltools (for Apple Silicon)
+
+## Requirements
+
+Install the required packages:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Data
+
+Ensure `data_filtered-1.csv` is in the project root directory. The file should contain the feature columns and a target column named `dGmix`.
+
+## Running the Models
+
+### Basic Hybrid Model
+
+Run the basic hybrid quantum-classical model:
+
+```bash
+python train_quantum_model.py
+```
+
+### Advanced Model with Cross-Validation
+
+Run the advanced model with K-fold cross-validation:
+
+```bash
+python advanced_quantum_model.py
+```
 
 ## <u>_Results and Citations_</u>
 
@@ -131,7 +163,6 @@ The learning curves show how the model improved during training:
 The following plot compares actual vs. predicted values for the test set:
 
 ![Actual vs Predicted Test](graphs/actual_vs_predicted_test.png)
-
 
 ### Statistical Analysis
 
