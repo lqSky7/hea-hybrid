@@ -192,6 +192,7 @@ class AdvancedHybridModel(nn.Module):
         for i, inputs in enumerate(x_pre):
             q_result = quantum_circuit(inputs.detach().numpy(), 
                                      self.q_weights.detach().numpy())
+            q_result = np.array(q_result)
             q_out[i] = torch.tensor(q_result)
 
         p1 = self.post_net1(q_out)
