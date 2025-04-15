@@ -8,8 +8,6 @@ This project implements an **advanced hybrid quantum-classical neural network** 
 
 ## <u>_Key Features_</u>
 
-WORK In progress
-
 - **Hybrid Architecture**: Combines classical deep learning with quantum circuits
 - **Ensemble Learning**: Utilizes _multiple models_ for enhanced prediction stability
 - **Advanced Feature Engineering**: Includes polynomial and logarithmic transformations
@@ -54,14 +52,29 @@ model_info = torch.load('/Users/ca5/Desktop/qnn_fnl/enhanced_hybrid_qnn_model.pt
 ## <u>_Project Structure_</u>
 
 ```
-qnn_fnl/
-├── data/                   # Dataset files
-├── testing/                # Training scripts
-│   └── h3.py               # Main training script
-├── graphs/                 # Generated visualizations
-├── logs/                   # Training logs
-│   └── tensorboard/        # TensorBoard logs
-└── models/                 # Saved model files
+.
+├── [WontFix]tensorflow-quantum
+├── advanced_hybrid_ensemble.pt
+├── classical
+├── data sanitization
+├── data_filtered-1.csv
+├── data.csv
+├── Deep
+├── enhanced_hybrid_qnn_model.pt
+├── graphs
+├── hybrid_qnn_model.pt
+├── LICENSE
+├── logs
+├── models
+├── PhysicsReport.pdf
+├── README.md
+├── requirements
+├── script.py
+├── setup
+├── testing
+├── training
+├── venv
+└── verification
 ```
 
 ## <u>_Requirements_</u>
