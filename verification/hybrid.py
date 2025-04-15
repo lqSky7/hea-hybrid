@@ -349,7 +349,7 @@ from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter(tb_dir)
 
 # More epochs and better batch size
-epochs = int(os.environ.get('EPOCHS', '5'))
+epochs = int(os.environ.get('EPOCHS', '40'))
 batch_size = int(os.environ.get('BATCH_SIZE', '32'))
 best_model_paths = [os.path.join(MODEL_DIR, f"best_hybrid_model_{i}.pt") for i in range(n_models)]
 
