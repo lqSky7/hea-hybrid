@@ -235,7 +235,7 @@ If you use this code or results in your work, please cite:
 
 1. **This repository:**
 
-   > L. Q. Sky, "Hybrid Quantum Neural Network for dGmix Prediction," GitHub repository, https://github.com/lqsky7/hea-hybrid, 2025.
+   > Diljot Singh, "Hybrid Quantum Neural Network for dGmix Prediction," GitHub repository, https://github.com/lqsky7/hea-hybrid, 2025.
 
 2. **Key references for methodology and background:**
 
