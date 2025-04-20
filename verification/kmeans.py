@@ -37,6 +37,22 @@ LOG_DIR = os.environ.get('LOG_DIR', os.path.join(BASE_DIR, 'logs'))
 MODEL_DIR = os.environ.get('MODEL_DIR', os.path.join(BASE_DIR, 'models'))
 GRAPHS_DIR = os.environ.get('GRAPHS_DIR', os.path.join(BASE_DIR, 'graphs'))
 
+# Configure matplotlib to use larger, bolder text for all plots
+plt.rcParams.update({
+    'font.size': 16,
+    'font.weight': 'bold',
+    'axes.labelsize': 20,
+    'axes.labelweight': 'bold',
+    'axes.titlesize': 22,
+    'axes.titleweight': 'bold',
+    'xtick.labelsize': 16,
+    'ytick.labelsize': 16,
+    'legend.fontsize': 16,
+    'legend.title_fontsize': 18,
+    'figure.titlesize': 24,
+    'figure.titleweight': 'bold'
+})
+
 # Ensure directories exist
 for directory in [DATA_DIR, LOG_DIR, MODEL_DIR, GRAPHS_DIR]:
     os.makedirs(directory, exist_ok=True)

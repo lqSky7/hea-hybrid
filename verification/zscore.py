@@ -15,6 +15,35 @@ import io
 
 np.seterr(divide='ignore', invalid='ignore')
 
+# Set up directories using environment variables with defaults
+BASE_DIR = os.environ.get('APP_DIR', os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.environ.get('DATA_DIR', os.path.join(BASE_DIR, 'data'))
+LOG_DIR = os.environ.get('LOG_DIR', os.path.join(BASE_DIR, 'logs'))
+MODEL_DIR = os.environ.get('MODEL_DIR', os.path.join(BASE_DIR, 'models'))
+GRAPHS_DIR = os.environ.get('GRAPHS_DIR', os.path.join(BASE_DIR, 'graphs'))
+
+# First create the log directory
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Set up logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join(LOG_DIR, "qnn_training.log")),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger('hybrid_qnn_trainer')
+
+# Now create other directories with proper logging
+for directory in [DATA_DIR, MODEL_DIR, GRAPHS_DIR]:
+    try:
+        os.makedirs(directory, exist_ok=True)
+        logger.info(f"Confirmed directory exists: {directory}")
+    except Exception as e:
+        logger.error(f"Failed to create directory {directory}: {str(e)}")
+
 # Check for available GPU devices
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -30,27 +59,6 @@ else:
 print(f"PyTorch version: {torch.__version__}")
 print(f"Active device: {device}")
 
-# Set up directories using environment variables with defaults
-BASE_DIR = os.environ.get('APP_DIR', os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.environ.get('DATA_DIR', os.path.join(BASE_DIR, 'data'))
-LOG_DIR = os.environ.get('LOG_DIR', os.path.join(BASE_DIR, 'logs'))
-MODEL_DIR = os.environ.get('MODEL_DIR', os.path.join(BASE_DIR, 'models'))
-GRAPHS_DIR = os.environ.get('GRAPHS_DIR', os.path.join(BASE_DIR, 'graphs'))
-
-# Ensure directories exist
-for directory in [DATA_DIR, LOG_DIR, MODEL_DIR, GRAPHS_DIR]:
-    os.makedirs(directory, exist_ok=True)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, "qnn_training.log")),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger('hybrid_qnn_trainer')
-
 # Use environment variable for dataset path with a default
 DATASET_PATH = os.environ.get('DATASET_PATH', os.path.join(DATA_DIR, 'data_filtered-1.csv'))
 logger.info(f"Loading dataset from: {DATASET_PATH}")
@@ -58,22 +66,17 @@ data = pd.read_csv(DATASET_PATH)
 logger.info(f"Data shape: {data.shape}")
 logger.info(f"Columns: {data.columns.tolist()}")
 logger.info(f"Sample:\n {data.head()}")
-
 logger.info("\nData types:")
 logger.info(f"{data.dtypes}")
-
 categorical_columns = data.select_dtypes(include=['object']).columns.tolist()
 logger.info(f"\nCategorical columns: {categorical_columns}")
-
 X = data.drop('dGmix', axis=1)
 y = data['dGmix']
-
 if categorical_columns:
     X = X.drop(columns=categorical_columns)
     logger.info(f"After dropping categorical columns: {X.shape} features")
 
 logger.info("Performing advanced feature engineering...")
-
 # Advanced feature engineering with more transformations
 numeric_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
 if numeric_cols:
@@ -81,25 +84,20 @@ if numeric_cols:
     poly = PolynomialFeatures(degree=2, include_bias=False, interaction_only=False)
     X_poly = poly.fit_transform(X)
     logger.info(f"Features shape after polynomial transformation: {X_poly.shape}")
-
     X_orig = pd.DataFrame(X)
     engineered_features = []
-    
     # Log transforms
     for col in X_orig.columns:
         if (X_orig[col] > 0).all():
             engineered_features.append(np.log1p(X_orig[col]).values)
-    
     # Exponential transforms
     for col in X_orig.columns:
         if not np.isinf(np.exp(X_orig[col] * 0.1)).any():
             engineered_features.append(np.exp(X_orig[col] * 0.1).values)
-    
     # Trigonometric transforms
     for col in X_orig.columns:
         engineered_features.append(np.sin(X_orig[col]).values)
         engineered_features.append(np.cos(X_orig[col]).values)
-    
     # Ratio features for important columns
     for i, col1 in enumerate(X_orig.columns):
         for col2 in X_orig.columns[i+1:]:
@@ -107,7 +105,6 @@ if numeric_cols:
                 ratio = X_orig[col1] / (X_orig[col2] + 1e-8)
                 if not np.isinf(ratio).any():
                     engineered_features.append(ratio.values)
-    
     if engineered_features:
         engineered_features = np.column_stack(engineered_features)
         X_combined = np.hstack((X_poly, engineered_features))
@@ -127,7 +124,6 @@ selector = SelectFromModel(
     LGBMRegressor(n_estimators=100, importance_type='gain'),
     threshold='mean'
 )
-
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42)
 logger.info(f"Initial train set: {X_train.shape}, Test set: {X_test.shape}")
@@ -143,7 +139,6 @@ feature_scaler = PowerTransformer(method='yeo-johnson')
 X_train_scaled = feature_scaler.fit_transform(X_train)
 X_test_scaled = feature_scaler.transform(X_test)
 logger.info("Data scaling completed with PowerTransformer")
-
 y_scaler = PowerTransformer(method='yeo-johnson')
 y_train_scaled = y_scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
 y_test_scaled = y_scaler.transform(y_test.values.reshape(-1, 1)).flatten()
@@ -158,12 +153,10 @@ dev = qml.device("default.qubit", wires=n_qubits)
 def quantum_circuit(inputs, weights):
     # Improved encoding strategy
     inputs_padded = np.pad(inputs, (0, n_qubits - len(inputs) % n_qubits), mode='constant')
-    
     # Amplitude encoding
     for i in range(n_qubits):
         qml.RY(inputs_padded[i % len(inputs_padded)] * np.pi, wires=i)
         qml.RZ(inputs_padded[i % len(inputs_padded)] * np.pi, wires=i)
-    
     # Apply Hadamard to create superposition
     for i in range(n_qubits):
         qml.Hadamard(wires=i)
@@ -175,8 +168,6 @@ def quantum_circuit(inputs, weights):
             qml.RX(weights[l, i, 0], wires=i)
             qml.RY(weights[l, i, 1], wires=i)
             qml.RZ(weights[l, i, 2], wires=i)
-            qml.U3(weights[l, i, 0], weights[l, i, 1], weights[l, i, 2], wires=i)
-        
         # Entanglement patterns (alternating between different strategies)
         if l % 3 == 0:
             # Linear entanglement
@@ -191,17 +182,14 @@ def quantum_circuit(inputs, weights):
             # All-to-all entanglement (star pattern)
             for i in range(1, n_qubits):
                 qml.CNOT(wires=[0, i])
-        
         # Add CZ gates for additional entanglement
         if l % 2 == 0:
             for i in range(0, n_qubits-1, 2):
                 qml.CZ(wires=[i, i+1])
-    
     # More comprehensive measurement strategy
     expectations = [qml.expval(qml.PauliZ(i)) for i in range(n_qubits)]
     expectations += [qml.expval(qml.PauliX(i)) for i in range(n_qubits)]
     expectations += [qml.expval(qml.PauliY(i)) for i in range(n_qubits)]
-    
     # Add some two-qubit observables
     for i in range(0, n_qubits-1, 4):
         expectations.append(qml.expval(qml.PauliZ(i) @ qml.PauliZ(i+1)))
@@ -213,10 +201,8 @@ class AdvancedHybridModel(nn.Module):
         super(AdvancedHybridModel, self).__init__()
         self.n_qubits = n_qubits
         self.n_layers = n_layers
-        
         # Enhanced measurement output size
         self.q_output_size = n_qubits * 3 + n_qubits // 4
-        
         # Deeper pre-processing neural network
         self.pre_net1 = nn.Sequential(
             nn.Linear(n_features, 512),
@@ -224,31 +210,26 @@ class AdvancedHybridModel(nn.Module):
             nn.SiLU(),  # SiLU (Swish) activation
             nn.Dropout(0.3),
         )
-        
         self.pre_net2 = nn.Sequential(
             nn.Linear(512, 256),
             nn.LayerNorm(256),
             nn.SiLU(),
             nn.Dropout(0.3),
         )
-        
         self.pre_net3 = nn.Sequential(
             nn.Linear(256, 128),
             nn.LayerNorm(128),
             nn.SiLU(),
             nn.Dropout(0.2),
         )
-        
         self.pre_out = nn.Sequential(
             nn.Linear(128, 64),
             nn.SiLU(),
             nn.Linear(64, n_qubits),
             nn.Tanh()
         )
-        
         # Initialize quantum weights with better initialization
         self.q_weights = nn.Parameter(torch.randn(n_layers, n_qubits, 3) * 0.02)
-        
         # Improved post-processing neural network
         self.post_net1 = nn.Sequential(
             nn.Linear(self.q_output_size, 256),
@@ -256,14 +237,12 @@ class AdvancedHybridModel(nn.Module):
             nn.SiLU(),
             nn.Dropout(0.3),
         )
-        
         self.post_net2 = nn.Sequential(
             nn.Linear(256, 128),
             nn.LayerNorm(128),
             nn.SiLU(),
             nn.Dropout(0.2),
         )
-        
         self.post_out = nn.Sequential(
             nn.Linear(128, 64),
             nn.SiLU(),
@@ -271,11 +250,10 @@ class AdvancedHybridModel(nn.Module):
             nn.SiLU(),
             nn.Linear(32, 1)
         )
-        
         # Multiple skip connections for better gradient flow
         self.skip_connection1 = nn.Linear(n_features, 256)
         self.skip_connection2 = nn.Linear(n_features, 128)
-    
+        
     def forward(self, x):
         batch_size = x.shape[0]
         x = x.to(device)
@@ -323,7 +301,6 @@ class FocalLoss(nn.Module):
         self.gamma = gamma
         self.alpha = alpha
         self.mse = nn.MSELoss(reduction='none')
-        
     def forward(self, pred, true):
         mse = self.mse(pred, true)
         loss = self.alpha * (1 - torch.exp(-mse)) ** self.gamma * mse
@@ -335,7 +312,6 @@ class CombinedLoss(nn.Module):
         super(CombinedLoss, self).__init__()
         self.mse_loss = nn.MSELoss()
         self.huber = nn.HuberLoss(delta=delta)
-        
     def forward(self, y_pred, y_true):
         return 0.5 * self.mse_loss(y_pred, y_true) + 0.5 * self.huber(y_pred, y_true)
 
@@ -349,15 +325,13 @@ from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter(tb_dir)
 
 # More epochs and better batch size
-epochs = int(os.environ.get('EPOCHS', '40'))
+epochs = int(os.environ.get('EPOCHS', '4'))
 batch_size = int(os.environ.get('BATCH_SIZE', '32'))
 best_model_paths = [os.path.join(MODEL_DIR, f"best_hybrid_model_{i}.pt") for i in range(n_models)]
-
 logger.info(f"Starting training for {epochs} epochs with {n_models} models")
 
 for model_idx, (model, optimizer, scheduler, best_model_path) in enumerate(zip(models, optimizers, schedulers, best_model_paths)):
     logger.info(f"Training model {model_idx+1}/{n_models}")
-    
     losses = []
     val_losses = []
     best_val_loss = float('inf')
@@ -367,16 +341,12 @@ for model_idx, (model, optimizer, scheduler, best_model_path) in enumerate(zip(m
     for epoch in range(epochs):
         model.train()
         epoch_loss = 0
-        
         # Use stratified mini-batches
         indices = torch.randperm(len(X_train_tensor))
-        
         for start_idx in range(0, len(indices), batch_size):
             idx = indices[start_idx:start_idx+batch_size]
-            
             batch_X = X_train_tensor[idx]
             batch_y = y_train_tensor[idx]
-            
             optimizer.zero_grad()
             outputs = model(batch_X)
             loss = criterion(outputs, batch_y)
@@ -384,27 +354,21 @@ for model_idx, (model, optimizer, scheduler, best_model_path) in enumerate(zip(m
             
             # Gradient clipping to prevent exploding gradients
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            
             optimizer.step()
             
             epoch_loss += loss.item()
-        
         # Adjust learning rate with scheduler
         scheduler.step()
-        
         model.eval()
         with torch.no_grad():
             val_outputs = model(X_test_tensor)
             val_loss = criterion(val_outputs, y_test_tensor).item()
-        
         avg_epoch_loss = epoch_loss / (len(X_train_tensor) // batch_size + 1)
         losses.append(avg_epoch_loss)
         val_losses.append(val_loss)
-        
         writer.add_scalar(f'Loss/train_model_{model_idx}', avg_epoch_loss, epoch)
         writer.add_scalar(f'Loss/validation_model_{model_idx}', val_loss, epoch)
         writer.add_scalar(f'LearningRate/model_{model_idx}', optimizer.param_groups[0]['lr'], epoch)
-        
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
@@ -415,15 +379,14 @@ for model_idx, (model, optimizer, scheduler, best_model_path) in enumerate(zip(m
             if patience_counter >= patience:
                 logger.info(f"Early stopping triggered after {epoch+1} epochs for model {model_idx+1}")
                 break
-        
         if (epoch+1) % 5 == 0 or epoch == 0:
             logger.info(f'Model {model_idx+1} - Epoch [{epoch+1}/{epochs}], Train Loss: {avg_epoch_loss:.6f}, Val Loss: {val_loss:.6f}')
-
+            
 # Load the best models
 for model_idx, (model, best_model_path) in enumerate(zip(models, best_model_paths)):
     model.load_state_dict(torch.load(best_model_path))
     logger.info(f"Loaded best model {model_idx+1} from {best_model_path}")
-
+        
 def ensemble_predict(models, X):
     predictions = []
     for model in models:
@@ -433,7 +396,6 @@ def ensemble_predict(models, X):
                 X = X.to(next(model.parameters()).device)
             pred = model(X).cpu().numpy()
             predictions.append(pred)
-    
     # Average predictions from all models
     ensemble_pred = np.mean(predictions, axis=0)
     return ensemble_pred
@@ -447,7 +409,7 @@ mse = mean_squared_error(y_test.values, y_pred)
 rmse = np.sqrt(mse)
 mae = mean_absolute_error(y_test.values, y_pred)
 r2 = r2_score(y_test.values, y_pred)
-
+        
 logger.info(f'Test MSE: {mse:.4f}')
 logger.info(f'Test RMSE: {rmse:.4f}')
 logger.info(f'Test MAE: {mae:.4f}')
@@ -457,6 +419,12 @@ logger.info(f'Test R²: {r2:.4f}')
 import glob
 
 logger.info(f"Graphs will be saved to: {GRAPHS_DIR}")
+def safe_save_figure(fig, path):
+    try:
+        fig.savefig(path, dpi=300)
+        logger.info(f"Figure saved successfully to {path}")
+    except Exception as e:
+        logger.error(f"Failed to save figure to {path}: {e}")
 
 # Create learning curve visualization
 fig1 = plt.figure(figsize=(12,8))
@@ -467,7 +435,7 @@ plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.title('Learning Curves for All Models')
 plt.legend()
-plt.savefig(os.path.join(GRAPHS_DIR, "learning_curves_ensemble.png"), dpi=300)
+safe_save_figure(fig1, os.path.join(GRAPHS_DIR, "learning_curves_ensemble.png"))
 plt.close(fig1)
 
 # Create prediction visualization
@@ -477,7 +445,7 @@ plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--')
 plt.xlabel('Actual dGmix')
 plt.ylabel('Predicted dGmix')
 plt.title(f'Actual vs Predicted (Test), R²: {r2:.4f}, MAE: {mae:.4f}')
-plt.savefig(os.path.join(GRAPHS_DIR, "actual_vs_predicted_test.png"), dpi=300)
+safe_save_figure(fig2, os.path.join(GRAPHS_DIR, "actual_vs_predicted_test.png"))
 plt.close(fig2)
 
 # Create error distribution
@@ -487,7 +455,7 @@ plt.hist(error_vals, bins=30, alpha=0.7)
 plt.xlabel('Error')
 plt.ylabel('Frequency')
 plt.title(f'Error Distribution, RMSE: {rmse:.4f}, MAE: {mae:.4f}')
-plt.savefig(os.path.join(GRAPHS_DIR, "error_distribution.png"), dpi=300)
+safe_save_figure(fig3, os.path.join(GRAPHS_DIR, "error_distribution.png"))
 plt.close(fig3)
 
 # Create residual plot
@@ -497,7 +465,7 @@ plt.axhline(0, color='red', linestyle='--')
 plt.xlabel('Predicted')
 plt.ylabel('Residual (Actual-Predicted)')
 plt.title('Residual Plot')
-plt.savefig(os.path.join(GRAPHS_DIR, "residual_plot.png"), dpi=300)
+safe_save_figure(fig4, os.path.join(GRAPHS_DIR, "residual_plot.png"))
 plt.close(fig4)
 
 # Z-score analysis of prediction errors
@@ -518,12 +486,25 @@ logger.info(f"Percentage of errors within 1 standard deviation: {within_1std:.2f
 logger.info(f"Percentage of errors within 2 standard deviations: {within_2std:.2f}% (Expected ~95.45%)")
 logger.info(f"Percentage of errors within 3 standard deviations: {within_3std:.2f}% (Expected ~99.73%)")
 
+# Set font properties for bigger and bolder text
+plt.rcParams.update({
+    'font.size': 16,
+    'font.weight': 'bold',
+    'axes.labelsize': 18,
+    'axes.labelweight': 'bold',
+    'axes.titlesize': 20,
+    'axes.titleweight': 'bold',
+    'xtick.labelsize': 14,
+    'ytick.labelsize': 14,
+    'legend.fontsize': 14
+})
+
 # Z-score distribution plot
 fig_z = plt.figure(figsize=(12,8))
 plt.hist(z_scores, bins=30, alpha=0.7, density=True)
-plt.xlabel('Z-score')
-plt.ylabel('Density')
-plt.title('Z-score Distribution of Prediction Errors')
+plt.xlabel('Z-score', fontsize=22, fontweight='bold')
+plt.ylabel('Density', fontsize=22, fontweight='bold')
+plt.title('Z-score Distribution of Prediction Errors', fontsize=24, fontweight='bold')
 
 # Add normal distribution curve for comparison
 x = np.linspace(min(z_scores), max(z_scores), 100)
@@ -539,7 +520,7 @@ plt.axvline(x=1, color='orange', linestyle='--', alpha=0.7)
 
 plt.legend()
 plt.grid(True, alpha=0.3)
-plt.savefig(os.path.join(GRAPHS_DIR, "z_score_distribution.png"), dpi=300)
+safe_save_figure(fig_z, os.path.join(GRAPHS_DIR, "z_score_distribution.png"))
 plt.close(fig_z)
 
 # QQ plot for normality assessment
@@ -547,7 +528,7 @@ from scipy import stats
 fig_qq = plt.figure(figsize=(10,10))
 stats.probplot(z_scores, dist="norm", plot=plt)
 plt.title('Q-Q Plot of Z-scores')
-plt.savefig(os.path.join(GRAPHS_DIR, "z_score_qq_plot.png"), dpi=300)
+safe_save_figure(fig_qq, os.path.join(GRAPHS_DIR, "z_score_qq_plot.png"))
 plt.close(fig_qq)
 
 # Feature importance analysis
@@ -559,7 +540,7 @@ if hasattr(selector, 'get_support'):
     plt.xlabel('Feature Index')
     plt.ylabel('Importance')
     plt.title('Feature Importance')
-    plt.savefig(os.path.join(GRAPHS_DIR, "feature_importance.png"), dpi=300)
+    safe_save_figure(fig5, os.path.join(GRAPHS_DIR, "feature_importance.png"))
 plt.close(fig5)
 
 # Save the ensemble model

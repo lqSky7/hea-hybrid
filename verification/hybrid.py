@@ -343,13 +343,27 @@ criterion = CombinedLoss(delta=1.0)
 optimizers = [optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-5) for model in models]
 schedulers = [optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2) for optimizer in optimizers]
 
+# Set up font configuration for plots with larger and bolder text
+plt.rcParams.update({
+    'font.size': 16,
+    'font.weight': 'bold',
+    'axes.titlesize': 20,
+    'axes.titleweight': 'bold',
+    'axes.labelsize': 18,
+    'axes.labelweight': 'bold',
+    'xtick.labelsize': 14,
+    'ytick.labelsize': 14,
+    'legend.fontsize': 16,
+    'figure.titlesize': 22
+})
+
 tb_dir = os.path.join(LOG_DIR, "tensorboard", datetime.now().strftime("%Y%m%d-%H%M%S"))
 os.makedirs(tb_dir, exist_ok=True)
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter(tb_dir)
 
 # More epochs and better batch size
-epochs = int(os.environ.get('EPOCHS', '40'))
+epochs = int(os.environ.get('EPOCHS', '5'))
 batch_size = int(os.environ.get('BATCH_SIZE', '32'))
 best_model_paths = [os.path.join(MODEL_DIR, f"best_hybrid_model_{i}.pt") for i in range(n_models)]
 
