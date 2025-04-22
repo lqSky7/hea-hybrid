@@ -22,7 +22,7 @@ git clone https://github.com/lqsky7/hea-hybrid.git
 cd qnn_fnl
 
 # Install dependencies
-pip install -r requirements/*
+pip install -r requirements/req.txt # Or requirements/req-hyb.txt for hybrid model specifics
 
 # For Apple Silicon users
 pip install coremltools  # Optional, for CoreML export
@@ -32,49 +32,74 @@ pip install coremltools  # Optional, for CoreML export
 
 ### Training the Model
 
-```python
-python testing/h3.py
+To train the main hybrid model:
+
+```bash
+python training/hyb.py
+```
+
+To train the deep neural network model:
+
+```bash
+python training/deepn1.py
+```
+
+For classical models, navigate to the respective directories under `classical/` and run the python scripts (e.g., `python classical/Dense\ Neural\ Networks\ \(DNN\)/dnn.py`).
+
+### Verification and Analysis
+
+Run verification scripts located in the `verification/` directory, for example:
+
+```bash
+python verification/hybrid.py
 ```
 
 ### Using Pre-trained Models
+
+Pre-trained models might be available in the `models/` directory within specific training or verification folders. Example usage (adjust paths as needed):
 
 ```python
 import torch
 from sklearn.preprocessing import RobustScaler, StandardScaler
 import numpy as np
 
-# Load the saved model
-model_info = torch.load('/Users/ca5/Desktop/qnn_fnl/enhanced_hybrid_qnn_model.pt')
+# Load a saved model (example path)
+model_info = torch.load('verification/models/enhanced_hybrid_qnn_model.pt')
 
-# For inference code, see examples/inference.py #work in progress
+# For inference code, refer to specific scripts or notebooks if available.
 ```
 
 ## <u>_Project Structure_</u>
 
 ```
 .
-├── [WontFix]tensorflow-quantum
-├── advanced_hybrid_ensemble.pt
-├── classical
-├── data sanitization
-├── data_filtered-1.csv
-├── data.csv
-├── Deep
-├── enhanced_hybrid_qnn_model.pt
-├── graphs
-├── hybrid_qnn_model.pt
 ├── LICENSE
-├── logs
-├── models
 ├── PhysicsReport.pdf
 ├── README.md
-├── requirements
-├── script.py
-├── setup
-├── testing
-├── training
-├── venv
-└── verification
+├── archive/
+├── classical/
+│   ├── Dense Neural Networks (DNN)/
+│   ├── Linear Neural Networks/
+│   └── Multi-Layer Perceptron (MLP)/
+│   └── Time Delay Neural Network (TDNN)/
+├── csvs/
+├── data sanitization/
+├── dataset/
+├── Deep/
+├── graphs/
+├── requirements/
+│   ├── req-hyb.txt
+│   └── req.txt
+├── scripts/
+├── setup/
+├── testing/
+├── training/
+│   ├── deepn1.py
+│   └── hyb.py
+└── verification/
+    ├── hybrid.py
+    ├── data_filtered-1.csv
+    └── ... (other verification scripts and data)
 ```
 
 ## <u>_Requirements_</u>
@@ -86,34 +111,49 @@ model_info = torch.load('/Users/ca5/Desktop/qnn_fnl/enhanced_hybrid_qnn_model.pt
 - pandas, numpy, matplotlib
 - _Optional_: coremltools (for Apple Silicon)
 
-## Requirements
+Ensure `verification/data_filtered-1.csv` is available for verification scripts that require it. The original dataset might be in `dataset/data.csv`.
 
 Install the required packages:
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements/req.txt # Or requirements/req-hyb.txt for hybrid model specifics
 ```
-
-## Data
-
-Ensure `data_filtered-1.csv` is in the project root directory. The file should contain the feature columns and a target column named `dGmix`.
 
 ## Running the Models
 
-### Basic Hybrid Model
+### Hybrid Model
 
-Run the basic hybrid quantum-classical model:
+Run the main hybrid quantum-classical model:
 
 ```bash
-python train_quantum_model.py
+python training/hyb.py
 ```
 
-### Advanced Model with Cross-Validation
+### Deep Learning Model
 
-Run the advanced model with K-fold cross-validation:
+Run the deep learning model:
 
 ```bash
-python advanced_quantum_model.py
+python training/deepn1.py
+```
+
+### Classical Models
+
+Navigate to the specific classical model directory and run its script:
+
+```bash
+cd classical/Dense\ Neural\ Networks\ \(DNN\)/
+python dnn.py
+# Or similar for MLP, Linear, TDNN
+```
+
+### Verification
+
+Run verification scripts from the `verification/` directory:
+
+```bash
+python verification/hybrid.py
+# Or other scripts like kmeans.py, zscore.py etc.
 ```
 
 ## <u>_Results and Citations_</u>
@@ -122,25 +162,25 @@ python advanced_quantum_model.py
 
 ### OUR Hybrid QNN Model Performance
 
-**Key Metrics** (from training logs):
+**Key Metrics** (derived from verification runs, see `PhysicsReport.pdf` for full details):
 
-- **MAE**: 0.98 kJ/mol
+- **MAE**: ~0.98 kJ/mol
 - **R²**: > 0.9
-- **Test RMSE**: 20.79 kJ/mol
+- **Test RMSE**: ~20.79 kJ/mol
 
 ---
 
 ## Comparison with Key Literature Findings
 
-This project introduces the first hybrid quantum-classical neural network for predicting Gibbs free energy in high-entropy alloys (HEAs), demonstrating competitive performance while maintaining full transparency through open datasets. The model achieves a mean absolute error (MAE) of 30.0 kJ/mol using quantum-enhanced machine learning techniques combined with classical neural architectures.
+This project introduces a hybrid quantum-classical neural network for predicting Gibbs free energy in high-entropy alloys (HEAs), demonstrating competitive performance while maintaining full transparency through open datasets using quantum-enhanced machine learning techniques combined with classical neural architectures.
 
 ## Performance Comparison
 
 | Method                     | MAE (kJ/mol) | Dataset Accessibility | Quantum Integration |
 | -------------------------- | ------------ | --------------------- | ------------------- |
-| CALPHAD (TCHEA7)           | 0.500          | Proprietary database  | No                  |
+| CALPHAD (TCHEA7)           | 0.500        | Proprietary database  | No                  |
 | Adaptive ML (ternary HEAs) | 18.7         | Closed synthetic data | No                  |
-| **Our QNN Model**          | **0.9**     | Open dataset          | Yes                 |
+| **Our QNN Model**          | **~0.98**    | Open dataset          | Yes                 |
 
 **Key differentiators:**
 
@@ -226,6 +266,20 @@ Q-Q plot for z-scores:
   ![Train Test R2 Comparison](verification/graphs/train_test_r2_comparison.png)
 - Error by data index:
   ![Error by Index](verification/graphs/error_by_index.png)
+
+---
+
+## Final Report
+
+The detailed final report for this project can be found in [PhysicsReport.pdf](./PhysicsReport.pdf).  
+It contains a comprehensive overview of the project, including:
+
+- Introduction and motivation
+- Theoretical background on quantum neural networks
+- Implementation details
+- Experimental setup and results
+- Analysis and discussion
+- Conclusions and future work
 
 ---
 
